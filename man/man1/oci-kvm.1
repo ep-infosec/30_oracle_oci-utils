@@ -1,0 +1,273 @@
+.\" Process this file with
+.\" groff -man -Tascii oci-kvm.1
+.\"
+.\" Copyright (c) 2018, 2019 Oracle and/or its affiliates. All rights reserved.
+.\" Licensed under the Universal Permissive License v 1.0 as shown
+.\" at http://oss.oracle.com/licenses/upl.
+.\"
+.TH OCI-KVM 1 "AUGUST 2019" Linux "User Manuals"
+.SH NAME
+oci-kvm - install and remove KVM guests on Oracle Cloud Infrastructure instances
+.SH SYNOPSIS
+.B oci-kvm create -D|--domain
+.I NAME
+.B [-d|--disk
+.I DISK_PATH
+.B ] [-v|--virtual-network
+.I NETWORK
+.B ] [-n|--net
+.I IP
+.B ]  [-p|--pool
+.I POOL
+.B ]  [-s|--disk-size
+.I DISK_SIZE
+.B ] -V|--virt
+.I VIRT-INSTALL_ARGS
+
+.B oci-kvm destroy -D|--domain
+.I NAME
+.B [--destroy-disks] [--stop] [--force]
+
+.B oci-kvm create-pool  -n|--name
+.I NAME
+.B {-d
+.I DEVICE
+.B |-N
+.I HOST
+.B -p
+.I PATH}
+
+.B oci-kvm list-pool [--output-mode MODE]
+
+.B oci-kvm create-network -n|--net
+.I NET
+.B -N|--network-name
+.I NETWORK_NAME
+.B -B|--ip-bridge
+.I IP_BRIDGE
+.B -E|--ip-end
+.I IP_END
+.B -S|--ip-start
+.I IP_START
+.B -P|--ip-prefix
+IP_PREFIX
+
+.B oci-kvm delete-network -N|--network-name
+.I NETWORK_NAME
+
+.SH DESCRIPTION
+The
+.B oci-kvm
+utility is used to create and configure KVM guests on Oracle Cloud Infrastructure
+instances that directly use Oracle Cloud Infrastructure resources, such as block storage and networking. The utility
+automates all steps of the guest creation process while also ensuring that Oracle Cloud Infrastructure resources
+have not been assigned to more than one KVM guest.  When a guest is no longer needed, the utility can also remove and unconfigure all system resources
+assigned to the guest.
+
+The
+.B oci-kvm create
+subcommand performs all actions required to create a KVM guest that uses Oracle Cloud Infrastructure block
+storage and Oracle Cloud Infrastructure VNICs for both the root disk and network interface, respectively.  For block
+storage, the device itself is validated and checked to ensure it has not been assigned
+to another guest. A storage pool can also be used. For virtual network interfaces, all virtual network infrastructure
+is created automatically, including virtual functions, VLANs, etc. indiviual
+block storage devices and VNICs that are required for each guest.  Guests cannot share
+either a VNIC or a block storage device.
+
+The
+.B oci-kvm create-pool
+subcommand creates a storage pool for hosting guest virtual disks. Pools can be created on block devices or FSS file systems.
+
+The
+.B oci-kvm list-pool
+shows data about all pools attached to this instance.
+
+The
+.B oci-kvm create-network
+subcommand creates a libvirt network that uses an Oracle Cloud Infrastruction VNIC. The created network offers an IP range that is usable by other KVM guests.
+See the
+.I '--virtual-network'
+option of the
+.B create
+command
+
+The
+.B oci-kvm delete-network
+subcommand deletes a libvirt network previously created by the
+.B create-network
+subcommand.
+
+When the oci-utils-kvm package is installed, it changes the configuration of the
+.BR ocid(8)
+setting
+.BR vf_net = true
+in the
+.BR /etc/oci-utils.conf.d/10-oci-kvm.conf file.
+This configuration change causes
+.BR ocid(8)
+to stop automatically configuring VNICs thereby leaving them for the KVM
+tools to manage.
+
+.SH OPTIONS
+.IP "--destroy-disks"
+For the destroy subcommand, specify that all disks based on libvirt storage pool must also be deleted.
+.IP "-s|--stop"
+For the destroy subcommand, specify that the guest should be first shutdown.
+.IP "-f|--force"
+For the destroy subcommand, specify that operations will be forced, no gracefull shutdown etc...
+.IP "-D NAME, --domain NAME"
+For both the
+.B create
+and
+.B destroy
+subcommands, operate on the given libvirt domain name.
+.IP "-d DISK_PATH, --disk DISK_PATH"
+For the
+.B create
+subcommand, specify the path to the block device to act as the root device for the new guest.  If this
+option is not specified, an unused block device is chosen arbitrarily. This option is exclusive with --pool.
+.br
+For the
+.B create-pool
+subcommand, specify the block device to be used to build the storage pool
+.IP "-N NETWORK_NAME, --network-name NETWORK_NAME"
+The name of the virtual (libvirt) network for the
+.B create-network
+and
+.B delete-network
+subcommands.
+.IP "-n NAME, --name NAME"
+For the
+.B create-pool
+subcommand, specify the name of the pool. When not specified, the default name is the chosen disk name.
+.IP "-n IP, --net IP"
+When entering the
+.B create
+subcommand, on bare metal instance host, specify the IP address of the Oracle Cloud Infrastructure VNIC to be assigned to the new guest.
+On a virtual machine instance host,specify the name of the Oracle Cloud Infrastructure VNIC (can be repeated multiple times). If this
+option is not specified, an unused VNIC is chosen arbitrarily.
+For the
+.B create-network
+subcommand, specify the IP address of the Oracle Cloud Infrastructure VNIC that is needed to build the network.
+.IP "-v VIRTUAL_NETWORK, --virtual-network VIRTUAL_NETWORK"
+Specify the name of the libvirt virtual network to attach the guest to (can be repeated multiple times).
+.IP "-N HOST, --netfshost HOST"
+For the
+.B create-pool
+subcommand, specify the name or IP of the NFS server.
+.IP "-p PATH, --path PATH"
+For the
+.B create-pool
+subcommand, specify the path of the NETFS resource.
+.IP "-p POOL, --pool POOL"
+Specify the name of the pool to be used to create the virtual disk.
+When used, the disk size must be also specified. To display the list of pools available on the host, use
+the following command
+.B /usr/bin/virsh pool-list
+command.
+This option is exclusive with --disk.
+.IP "-s DISK_SIZE, --disk-size DISK_SIZE"
+Specify the size of the disk in GB  to be created within the given storage pool. This option is mandatory when the --pool option is specified.
+.IP "-V VIRT-INSTALL_ARGS, --virt VIRT-INSTALL_ARGS"
+Specify virt-install arguments. Each argument that is specified after either -V or --virt is passed into virt-install when
+this tool executes that command. The
+.B  oci-kvm
+ utility provides the following arguments:
+--hvm, --name, --cpu, --disk, --network.
+.IP "-B IP_BRIDGE, --ip-bridge IP_BRIDGE"
+For the
+.B create-network
+subcommand, specify the IP address of the bridge to be used to build the virtual network.
+.IP "-S IP_START, --ip-start IP_START"
+For the
+.B create-network
+subcommand, specify the first IP address in the virtual network address space.
+.IP "-E IP_END, --ip-end IP_END"
+For the
+.B create-network
+subcommand, specify the last IP address in the virtual network address space.
+.IP "-P IP_PREFIX, --ip-prefix IP_PREFIX"
+For the
+.B create-network
+subcommand, specify the network prefix in the virtual network address space.
+.IP --output-mode={parsable,table,json,text}
+Display list of pools as table, using json format, simple text or using parsable output
+(default is table)
+.IP --help
+
+.SH EXAMPLES
+
+oci-kvm create-pool --disk /dev/sdb --name vm_pool
+.RS 3
+Creates a storage pool on disk
+.I /dev/sdb
+with the name
+.I vm_pool.
+.RE
+
+oci-kvm create-pool --netfshost 192.168.10.9 --path /FileSystem-20190405-1454 --name guest_pool
+.RS 3
+Creates a storage pool on NFS resource
+.I FileSystem-20190405-1454
+on NFS server
+.I 192.168.10.9
+with name
+.I guest_pool
+.RE
+
+oci-kvm create-network --network-name vnic003 --net 100.100.251.95 --ip-bridge 192.168.200.1 --ip-start 192.168.200.10 --ip-end 192.168.200.100 --ip-prefix 24
+.RS 3
+Creates a virtual network named
+.I vnic003
+on VNIC with
+.I 100.110.251.95
+as the IP address.
+.RE
+
+oci-kvm create --domain guestol79 --pool vm_pool --virtual-network vnic003 --disk-size=24 --virt --vcpus 4 --memory 8192 --boot cdrom,hd --location /isos/ol79_x86_64.iso --nographics --console pty,target_type=serial --console pty,target_type=virtio --noautoconsole --os-variant=ol7.9 --extra-args="console=ttyS0,115200n8"
+.RS 3
+Creates a guest
+.I guestol79
+with a root disk of
+.I 24GB
+on storage pool
+.I vm_pool
+using network
+.I vnic003
+with
+.I 4
+cpus,
+.I 8GB
+memory.
+.RE
+
+oci-kvm create --domain guestol7 --pool kvm-pool --net 100.200.10.20  --disk-size=16 --virt --vcpus 4 --memory 8192 --boot cdrom,hd --location /isos/ol79_x86_64.iso --nographics --console pty,target_type=serial --console pty,target_type=virtio --noautoconsole --os-variant=ol7.9 --initrd-inject /root/guestol7_002_ks.cfg --extra-args="ks=file:guestol7_ks.cfg console=ttyS0,115200n8"
+.RS 3
+Creates a guest
+.I
+guestol7
+on pool
+.I
+kvm-pool
+using passthrough network
+.I 100.200.10.20
+on a
+.I 16GB
+disk with
+.I 4
+cpus and
+.I 8GB
+memory and using a kickstart file.
+.RE
+
+oci-kvm list-pool --output-mode json
+.RS 3
+Shows data about pools attached to this instance in json format.
+.RE
+
+.SH DIAGNOSTICS
+Return an exit status of 0 for success or 1 if an error occurred.
+
+.SH "SEE ALSO"
+.BR ocid (8)
+.BR oci-utils.conf.d (5)

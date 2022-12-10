@@ -1,0 +1,114 @@
+#
+# Copyright (c) 2017, 2019 Oracle and/or its affiliates. All rights reserved.
+# Licensed under the Universal Permissive License v 1.0 as shown
+# at http://oss.oracle.com/licenses/upl.
+
+"""
+Oracle Cloud Infrastructure utilities - one shot service that configures
+networking for virtual machines.
+"""
+
+import argparse
+import logging
+import os
+import sys
+
+import oci_utils
+import oci_utils.kvm.virt
+
+__logger = logging.getLogger('oci-utils.oci-upgrade')
+
+
+def parse_args():
+    """
+    Parse the command line arguments and return an object representing the
+    command line (as returned by argparse's parse_args())
+
+    Returns
+    -------
+        The parsed command line object.
+    """
+
+    parser = argparse.ArgumentParser(description='oci-utils daemon')
+    parser.add_argument('--debug', action='store_true',
+                        help='display diagnostic output'),
+
+    those_arguments = parser.parse_args()
+    return those_arguments
+
+
+def upgrade_v2_domains():
+    """
+    Upgrade a kvm v2 domain.
+
+    Returns
+    -------
+        No return value.
+    """
+    config = oci_utils.impl.virt.sysconfig.read_network_config()
+    domains = oci_utils.impl.virt.virt_utils.get_domains_no_libvirtd()
+    domain_xml = {d: oci_utils.impl.virt.virt_utils.get_domain_xml_no_libvirtd(d)
+                  for d in domains}
+    domain_interfaces = \
+        {d: oci_utils.impl.virt.virt_utils.get_interfaces_from_domain(domain_xml[d])
+         for d in domains}
+
+    targets = []
+    for d, ifaces in domain_interfaces.items():
+        for mac, name in ifaces.items():
+            targets.append(mac.lower())
+            targets.append(name)
+
+    targets = set(targets)
+
+    new_config = {}
+    to_remove = []
+    for name, conf in config.items():
+        mac = conf.get('MACADDR', "").lower()
+        onboot = conf.get('ONBOOT', "")
+
+        # Don't muck with interfaces that are either already
+        # up to date or are controlled by another entity
+        if onboot != 'no':
+            continue
+
+        # Check if this is a macvlan interface
+        if mac in targets:
+            n, c = oci_utils.impl.virt.sysconfig.make_vf(name, mac)
+            new_config[n] = c
+            to_remove.append(name)
+            continue
+
+        # Check if this is a vlan interface
+        if name in targets:
+            parent, vlan_id = name.split('.')
+            n, c = oci_utils.impl.virt.sysconfig.make_vlan(parent, vlan_id,
+                                                     config[parent]['MACADDR'])
+            new_config[n] = c
+            to_remove.append(name)
+
+    oci_utils.impl.virt.sysconfig.write_network_config(new_config)
+    oci_utils.impl.virt.sysconfig.delete_network_config(to_remove)
+
+
+def main():
+    """
+    Main program
+
+    Returns
+    -------
+        int
+            0
+    """
+
+    if os.geteuid() != 0:
+        sys.stderr.write("This program must be run with root privileges.\n")
+        sys.exit(1)
+
+
+    upgrade_v2_domains()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

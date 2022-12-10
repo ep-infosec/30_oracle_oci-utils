@@ -1,0 +1,18 @@
+[Unit]
+Description=Oracle Cloud Infrastructure utilities daemon
+After=iscsid.service
+
+[Service]
+Type=notify
+NotifyAccess=all
+ExecStart=/usr/libexec/ocid  --no-daemon
+ExecStop=/usr/libexec/ocid --stop-all
+TimeoutStopSec=5
+PIDFile=/var/run/ocid.pid
+Restart=always
+StandardOutput=syslog
+StandardError=syslog
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

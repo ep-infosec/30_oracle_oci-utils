@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# oci-utils
+#
+# Copyright (c) 2019 Oracle and/or its affiliates. All rights reserved.
+# Licensed under the Universal Permissive License v 1.0 as shown
+# at http://oss.oracle.com/licenses/upl.
+
+
+# Launsh ocid daemon with appropriate python program
+
+
+_PY3=/usr/bin/python3
+_PY_CMD=ocid_main.py
+s_dir=`${_PY3} -c 'import os.path ; import oci_utils.impl ; print (os.path.dirname(oci_utils.impl.__file__))'`
+
+exec ${_PY3}  ${s_dir}/${_PY_CMD} "$@"
